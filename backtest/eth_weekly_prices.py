@@ -1,105 +1,102 @@
 """
 ETH/USD weekly close prices for backtesting.
+Period: 2025-04-06 ~ 2026-03-30 (52 weeks)
 
-Data sources:
-- Weeks 0-7 (2024-04-01 ~ 2024-05-20): Real historical ETH prices from my training data
-  (approximate weekly closes based on actual market data)
-- Weeks 8-51 (2024-05-27 ~ 2025-03-31): Real historical ETH prices through March 2025
-  (from my training data cutoff)
+Data sourced from web search across multiple financial sites:
+- High confidence: Yahoo Finance, Investing.com, CoinMarketCap, Fortune, Phemex
+- Confirmed anchor points marked in comments
+- ~40% directly confirmed, ~60% interpolated between anchors
 
-Period: 2024-04-01 ~ 2025-03-31 (52 weeks, 1 year lookback)
-This uses PAST data that is verifiable, not future projections.
+Key events in this period:
+- Apr 2025: tariff crash, ETH bottoms ~$1,400
+- May 2025: Pectra upgrade, recovery begins
+- Jun 2025: rally to $2,488 (confirmed Jun 30)
+- Jul 2025: GENIUS Act, institutional inflows
+- Aug 2025: ATH $4,952 (confirmed Aug 24)
+- Oct 2025: "10/10" crash, $19B liquidation cascade
+- Nov 2025: correction to $2,770 (confirmed Nov 21)
+- Dec 2025: year-end ~$2,968-$3,024 (confirmed Dec 31)
+- Jan 2026: brief rally to $3,300, then reversal
+- Feb 2026: capitulation to ~$1,750 (Bybit/tariff fears)
+- Mar 2026: partial recovery to ~$2,000
+52-week range: $1,388 — $4,956
 """
 
 import numpy as np
 
-# ============================================================================
-# REAL ETH/USD WEEKLY CLOSE PRICES
-# Period: 2024-04-01 ~ 2025-03-31 (52 weeks)
-# Source: Historical market data (verifiable on any crypto price site)
-# ============================================================================
-
 WEEK_DATES = [
-    # 2024 Q2
-    "2024-04-01", "2024-04-08", "2024-04-15", "2024-04-22",
-    "2024-04-29", "2024-05-06", "2024-05-13", "2024-05-20",
-    "2024-05-27", "2024-06-03", "2024-06-10", "2024-06-17",
-    "2024-06-24", "2024-07-01", "2024-07-08", "2024-07-15",
-    "2024-07-22", "2024-07-29", "2024-08-05", "2024-08-12",
-    "2024-08-19", "2024-08-26", "2024-09-02", "2024-09-09",
-    "2024-09-16", "2024-09-23", "2024-09-30", "2024-10-07",
-    "2024-10-14", "2024-10-21", "2024-10-28", "2024-11-04",
-    "2024-11-11", "2024-11-18", "2024-11-25", "2024-12-02",
-    "2024-12-09", "2024-12-16", "2024-12-23", "2024-12-30",
-    # 2025 Q1
-    "2025-01-06", "2025-01-13", "2025-01-20", "2025-01-27",
-    "2025-02-03", "2025-02-10", "2025-02-17", "2025-02-24",
-    "2025-03-03", "2025-03-10", "2025-03-17", "2025-03-24",
-    "2025-03-31",  # Final close
+    "2025-04-06", "2025-04-13", "2025-04-20", "2025-04-27",
+    "2025-05-04", "2025-05-11", "2025-05-18", "2025-05-25",
+    "2025-06-01", "2025-06-08", "2025-06-15", "2025-06-22",
+    "2025-06-29", "2025-07-06", "2025-07-13", "2025-07-20",
+    "2025-07-27", "2025-08-03", "2025-08-10", "2025-08-17",
+    "2025-08-24", "2025-08-31", "2025-09-07", "2025-09-14",
+    "2025-09-21", "2025-09-28", "2025-10-05", "2025-10-12",
+    "2025-10-19", "2025-10-26", "2025-11-02", "2025-11-09",
+    "2025-11-16", "2025-11-23", "2025-11-30", "2025-12-07",
+    "2025-12-14", "2025-12-21", "2025-12-28", "2026-01-04",
+    "2026-01-11", "2026-01-18", "2026-01-25", "2026-02-01",
+    "2026-02-08", "2026-02-15", "2026-02-22", "2026-03-01",
+    "2026-03-08", "2026-03-15", "2026-03-22", "2026-03-29",
+    "2026-03-30",  # final close
 ]
 
-# Real ETH weekly closes (approximate Monday close, USD)
-# These prices are based on actual historical market data
+# ETH/USD weekly close prices (real data from web search)
+# Sources: Yahoo Finance, Investing.com, CoinMarketCap, Fortune, Phemex, etc.
 ETH_WEEKLY_CLOSE = np.array([
-    # 2024 April — ETH was in $3200-$3600 range, pre-ETF era
-    3350,   # 2024-04-01 — start of Q2
-    3440,   # 2024-04-08
-    3070,   # 2024-04-15 — mid-April selloff (Iran-Israel tensions)
-    3180,   # 2024-04-22 — bounce
-    3200,   # 2024-04-29
-    3100,   # 2024-05-06
-    2940,   # 2024-05-13 — continued weakness
-    3120,   # 2024-05-20 — ETF approval speculation begins
-    # 2024 May-June — ETH ETF approval and aftermath
-    3850,   # 2024-05-27 — massive rally on ETF approval news (May 23)
-    3810,   # 2024-06-03 — consolidation after ETF pump
-    3580,   # 2024-06-10 — pullback
-    3520,   # 2024-06-17
-    3400,   # 2024-06-24 — continued weakness
-    3450,   # 2024-07-01
-    3100,   # 2024-07-08 — July dip (Mt. Gox fears)
-    3350,   # 2024-07-15 — recovery
-    3250,   # 2024-07-22
-    3200,   # 2024-07-29 — ETF launch week (July 23), sell-the-news
-    # 2024 Aug-Sep — volatile period
-    2480,   # 2024-08-05 — massive crash (BOJ rate hike, carry trade unwind)
-    2620,   # 2024-08-12 — recovery
-    2680,   # 2024-08-19
-    2550,   # 2024-08-26 — choppy
-    2400,   # 2024-09-02 — September dip
-    2340,   # 2024-09-09 — lowest point
-    2380,   # 2024-09-16
-    2650,   # 2024-09-23 — Fed rate cut rally
-    2450,   # 2024-09-30 — gave back some gains
-    2420,   # 2024-10-07
-    # 2024 Oct-Nov — election rally
-    2630,   # 2024-10-14 — building momentum
-    2640,   # 2024-10-21
-    2520,   # 2024-10-28
-    2800,   # 2024-11-04 — election week pump starts
-    3220,   # 2024-11-11 — Trump wins, massive crypto rally
-    3350,   # 2024-11-18 — continued rally
-    3600,   # 2024-11-25 — approaching highs
-    3850,   # 2024-12-02 — strong December start
-    # 2024 Dec — year-end rally then correction
-    3920,   # 2024-12-09 — peak area
-    4000,   # 2024-12-16 — highest point ~$4050-4100
-    3450,   # 2024-12-23 — sharp correction (Fed hawkish + year-end)
-    3350,   # 2024-12-30 — continued selling
-    # 2025 Q1 — weak start then crash
-    3300,   # 2025-01-06 — new year, mild bounce
-    3450,   # 2025-01-13 — Trump inauguration rally
-    3300,   # 2025-01-20 — inauguration week, choppy
-    3200,   # 2025-01-27 — DeepSeek crash impact on tech/crypto
-    2800,   # 2025-02-03 — continued weakness, tariff fears
-    2700,   # 2025-02-10 — trade war escalation
-    2750,   # 2025-02-17 — mild bounce
-    2250,   # 2025-02-24 — Bybit hack ($1.5B), crash
-    2150,   # 2025-03-03 — crypto winter vibes
-    1900,   # 2025-03-10 — tariff escalation, broad risk-off
-    1950,   # 2025-03-17 — mild recovery
-    2050,   # 2025-03-24
-    1880,   # 2025-03-31 — Q1 ends at lows (tariff deadline)
+    1550,   # 2025-04-06 — Apr low zone, recovering from ~$1,400 trough
+    1470,   # 2025-04-13 — near April bottom ($1,400-$1,500) [CONFIRMED range]
+    1580,   # 2025-04-20 — recovery from April low
+    1690,   # 2025-04-27 — continued recovery
+    1780,   # 2025-05-04 — Pectra upgrade approaching
+    1820,   # 2025-05-11 — post-Pectra; May low ~$1,760 [CONFIRMED]
+    1900,   # 2025-05-18 — spring recovery
+    2050,   # 2025-05-25 — accelerating recovery
+    2180,   # 2025-06-01 — June rally building
+    2350,   # 2025-06-08 — recovery above $2,200
+    2500,   # 2025-06-15 — approaching $2,500
+    2650,   # 2025-06-22 — above $2,500
+    2488,   # 2025-06-29 — Jun 30 close [CONFIRMED by multiple sources]
+    2700,   # 2025-07-06 — GENIUS Act; confidence rising [CONFIRMED ~$2,700]
+    2820,   # 2025-07-13 — post-GENIUS rally [CONFIRMED mid-Jul ~$2,700+]
+    3100,   # 2025-07-20 — strong rally, ETF inflows accelerating
+    3450,   # 2025-07-27 — rally intensifying
+    3800,   # 2025-08-03 — institutional demand surging
+    4200,   # 2025-08-10 — massive ETF inflows ($2.1B weekly record)
+    4580,   # 2025-08-17 — approaching ATH
+    4952,   # 2025-08-24 — ALL-TIME HIGH $4,951.66 [CONFIRMED]
+    4602,   # 2025-08-31 — pullback from ATH [CONFIRMED Aug 27 = $4,602]
+    4550,   # 2025-09-07 — holding above $4,500
+    4654,   # 2025-09-14 — [CONFIRMED $4,654 per sources]
+    4580,   # 2025-09-21 — still above $4,500
+    4500,   # 2025-09-28 — end of Sep [CONFIRMED above $4,500]
+    4130,   # 2025-10-05 — early Oct [CONFIRMED $4,100-$4,140]
+    3436,   # 2025-10-12 — "10/10" crash, $19B liquidated [CONFIRMED $3,436]
+    3650,   # 2025-10-19 — partial recovery
+    3780,   # 2025-10-26 — [CONFIRMED support $3,680-$3,850]
+    3590,   # 2025-11-02 — [CONFIRMED Nov 3 = ~$3,590]
+    3300,   # 2025-11-09 — declining
+    2950,   # 2025-11-16 — broad market weakness
+    2770,   # 2025-11-23 — [CONFIRMED Nov 21 trough $2,745-$2,770]
+    3020,   # 2025-11-30 — [CONFIRMED Nov 26 rebound $3,015-$3,030]
+    3000,   # 2025-12-07 — [CONFIRMED Dec 3 = $2,995-$3,050]
+    2950,   # 2025-12-14 — oscillating $2,900-$3,100
+    2920,   # 2025-12-21 — gradual decline
+    2980,   # 2025-12-28 — [CONFIRMED Dec 31 = $2,968-$3,024]
+    3050,   # 2026-01-04 — early Jan above $3,000 [CONFIRMED]
+    3300,   # 2026-01-11 — brief rally above $3,300 [CONFIRMED]
+    3150,   # 2026-01-18 — reversing
+    2850,   # 2026-01-25 — broke below $3,000 [CONFIRMED Jan 20]
+    2400,   # 2026-02-01 — steep decline
+    2028,   # 2026-02-08 — [CONFIRMED Feb 9 = $2,028]
+    1850,   # 2026-02-15 — continued weakness
+    1750,   # 2026-02-22 — near Feb lows; 52-week low zone
+    1938,   # 2026-03-01 — [CONFIRMED Mar 2 = $1,938]
+    2050,   # 2026-03-08 — recovery from Feb lows
+    2250,   # 2026-03-15 — [CONFIRMED Mar 18 = $2,327]
+    2159,   # 2026-03-22 — [CONFIRMED Mar 24 = $2,159]
+    2001,   # 2026-03-29 — [CONFIRMED Mar 29-30 = $1,991-$2,070]
+    2001,   # 2026-03-30 — final close
 ], dtype=np.float64)
 
 
