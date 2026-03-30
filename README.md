@@ -1,31 +1,63 @@
-# Nomad Finance
+# Nomad Protocol
 
-DeFi vault protocol built on ERC-4626 with integrated strategy, pricing, hedging, and risk management modules.
+> DeFi의 QYLD. USDC 넣으면 35% APR. 자동. 끝.
+
+Automated options strategy protocol on **Hyperliquid** (HyperEVM + HyperCore).
 
 ## Architecture
 
-- **Vault** — ERC-4626 compliant vault for asset management
-- **Strategy** — Pluggable yield strategies
-- **Pricing** — On-chain asset pricing
-- **Hedge** — Delta-neutral hedging via options/perps
-- **Risk** — Portfolio risk assessment and limits
+```
+User → USDC Deposit → NomadVault (ERC-4626)
+                          ↓
+                  Strategy Module (CC, CSP, IC)
+                          ↓
+                  Rysk RFQ → Option Sell → Premium
+                          ↓
+                  Delta Hedge → HyperCore Perps
+                          ↓
+                  Settlement → Auto-roll → Repeat
+```
 
-## Protocol Integrations
+## Key Components
 
-- **HyperCore** — Perpetual DEX for delta hedging
-- **Rysk** — Options protocol for volatility strategies
+| Module | Description |
+|--------|-------------|
+| **NomadVault** | ERC-4626 vault with epoch management, fee collection |
+| **CoveredCall** | Sell calls via Rysk RFQ, collect premium |
+| **CashSecuredPut** | Sell puts via Rysk RFQ, collect premium |
+| **PricingEngine** | BSM pricing, EWMA vol, Greeks, strike selection |
+| **DeltaHedger** | HyperCore perp hedging via CoreWriter |
+| **RiskManager** | Portfolio Greeks, max drawdown, exposure limits |
+
+## Strategies
+
+| Strategy | Target APR | Phase |
+|----------|-----------|-------|
+| Covered Call | 20-55% | Phase 1 (Q3 2026) |
+| Cash-Secured Put | 18-50% | Phase 1 (Q3 2026) |
+| Iron Condor | 15-45% | Phase 2 (Q4 2026) |
+| Protective Put | Insurance | Phase 2 |
+| Bull Call Spread | Variable | Phase 2 |
+| Straddle | Variable | Phase 2 |
+
+## Revenue Model
+
+- Performance Fee: 10-20% of profits
+- Management Fee: 1-2% annual on TVL
+- Early Exit Fee: 0.5-1% (mid-epoch)
+
+## Dependencies
+
+- [hyper-evm-lib](https://github.com/hyperliquid-dev/hyper-evm-lib) — CoreWriter, Precompiles
+- [Rysk Finance](https://github.com/rysk-finance) — RFQ, Ciao settlement
+- [OpenZeppelin](https://github.com/OpenZeppelin/openzeppelin-contracts) — ERC-4626, access control
 
 ## Development
 
 ```bash
-# Build
 forge build
-
-# Test
 forge test
-
-# Deploy
-forge script script/Deploy.s.sol --rpc-url <RPC_URL> --broadcast
+forge test -vvv  # verbose
 ```
 
 ## License
