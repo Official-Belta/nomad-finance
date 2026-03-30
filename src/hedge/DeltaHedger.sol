@@ -8,15 +8,13 @@ import {ICoreWriter} from "../interfaces/hypercore/ICoreWriter.sol";
 /// @notice Delta hedging via HyperCore perpetuals
 /// @dev Reads prices via precompiles, places perp orders via CoreWriter
 contract DeltaHedger is Ownable {
-    // HyperCore CoreWriter at fixed address
     ICoreWriter public constant CORE_WRITER = ICoreWriter(0x3333333333333333333333333333333333333333);
 
-    // Precompile addresses for price queries
     address public constant ORACLE_PX = address(0x0803);
     address public constant MARK_PX = address(0x0804);
 
     struct HedgePosition {
-        uint32 asset;           // HyperCore asset ID
+        uint32 asset;
         int256 size;            // Positive = long, negative = short
         uint256 entryPrice;
         uint256 timestamp;
@@ -25,7 +23,7 @@ contract DeltaHedger is Ownable {
     mapping(bytes32 => HedgePosition) public hedgePositions;
     bytes32[] public activePositionIds;
 
-    int256 public targetDelta;      // Target portfolio delta (should be ~0)
+    int256 public targetDelta;
     uint256 public hedgeThreshold;  // Min delta deviation before rehedge (bps)
 
     event HedgeOpened(bytes32 indexed id, uint32 asset, int256 size, uint256 price);
@@ -33,10 +31,9 @@ contract DeltaHedger is Ownable {
     event HedgeAdjusted(bytes32 indexed id, int256 oldSize, int256 newSize);
 
     constructor(address owner_) Ownable(owner_) {
-        hedgeThreshold = 500; // 5% delta deviation triggers rehedge
+        hedgeThreshold = 500; // 5%
     }
 
-    /// @notice Get current net delta across all hedge positions
     function netDelta() external view returns (int256 delta) {
         for (uint256 i = 0; i < activePositionIds.length; i++) {
             delta += hedgePositions[activePositionIds[i]].size;
@@ -44,23 +41,18 @@ contract DeltaHedger is Ownable {
     }
 
     /// @notice Open a hedge position on HyperCore
-    /// @param asset HyperCore asset ID
-    /// @param size Position size (negative for short)
-    /// @param limitPrice Limit price for the order
     function openHedge(uint32 asset, int256 size, uint64 limitPrice) external onlyOwner returns (bytes32 id) {
         id = keccak256(abi.encodePacked(asset, size, block.timestamp, msg.sender));
 
         bool isBuy = size > 0;
         uint64 absSize = uint64(size > 0 ? uint256(int256(size)) : uint256(-int256(size)));
 
-        // Place limit order via CoreWriter
-        // Action code 1 = limit order
         bytes memory action = abi.encodePacked(
             uint8(1),           // action: limit order
-            asset,              // asset ID
-            isBuy,              // direction
-            limitPrice,         // price
-            absSize,            // size
+            asset,
+            isBuy,
+            limitPrice,
+            absSize,
             false,              // reduceOnly
             uint8(2)            // TIF: IOC
         );
@@ -77,29 +69,60 @@ contract DeltaHedger is Ownable {
         emit HedgeOpened(id, asset, size, uint256(limitPrice));
     }
 
-    /// @notice Close a hedge position
+    /// @notice Close a hedge position with PnL tracking
     function closeHedge(bytes32 id) external onlyOwner {
         HedgePosition storage pos = hedgePositions[id];
         require(pos.timestamp > 0, "Position not found");
 
-        // Place opposite order to close
-        bool isBuy = pos.size < 0; // close short = buy, close long = sell
+        bool isBuy = pos.size < 0;
         uint64 absSize = uint64(pos.size > 0 ? uint256(int256(pos.size)) : uint256(-int256(pos.size)));
+
+        // Get current mark price from precompile
+        uint256 markPrice = _getMarkPrice(pos.asset);
+        uint64 closePrice = markPrice > 0 ? uint64(markPrice) : uint64(0);
 
         bytes memory action = abi.encodePacked(
             uint8(1),
             pos.asset,
             isBuy,
-            uint64(0),      // market price (TODO: get from precompile)
+            closePrice,
             absSize,
-            true,           // reduceOnly = true
-            uint8(2)        // IOC
+            true,               // reduceOnly
+            uint8(2)            // IOC
         );
         CORE_WRITER.sendRawAction(action);
 
-        // Remove from active positions
+        // Calculate PnL
+        int256 pnl = _calcPnl(pos.size, pos.entryPrice, markPrice > 0 ? markPrice : pos.entryPrice);
+
         _removePosition(id);
-        emit HedgeClosed(id, 0); // TODO: calculate actual PnL
+        emit HedgeClosed(id, pnl);
+    }
+
+    /// @notice Adjust an existing hedge (partial close/extend)
+    function adjustHedge(bytes32 id, int256 newSize, uint64 limitPrice) external onlyOwner {
+        HedgePosition storage pos = hedgePositions[id];
+        require(pos.timestamp > 0, "Position not found");
+
+        int256 sizeDiff = newSize - pos.size;
+        if (sizeDiff == 0) return;
+
+        bool isBuy = sizeDiff > 0;
+        uint64 absSize = uint64(sizeDiff > 0 ? uint256(sizeDiff) : uint256(-sizeDiff));
+
+        bytes memory action = abi.encodePacked(
+            uint8(1),
+            pos.asset,
+            isBuy,
+            limitPrice,
+            absSize,
+            false,
+            uint8(2)
+        );
+        CORE_WRITER.sendRawAction(action);
+
+        emit HedgeAdjusted(id, pos.size, newSize);
+        pos.size = newSize;
     }
 
     /// @notice Emergency close all hedges
@@ -119,11 +142,36 @@ contract DeltaHedger is Ownable {
         delete activePositionIds;
     }
 
+    /// @notice Get the number of active positions
+    function activePositionCount() external view returns (uint256) {
+        return activePositionIds.length;
+    }
+
     function setHedgeThreshold(uint256 newThreshold) external onlyOwner {
         hedgeThreshold = newThreshold;
     }
 
     // --- Internal ---
+
+    /// @dev Get mark price from HyperCore precompile (0x0804)
+    function _getMarkPrice(uint32 asset) internal view returns (uint256) {
+        (bool ok, bytes memory data) = MARK_PX.staticcall(abi.encodePacked(asset));
+        if (ok && data.length >= 32) {
+            return abi.decode(data, (uint256));
+        }
+        return 0; // fallback: 0 means unavailable
+    }
+
+    /// @dev Calculate PnL for a hedge position
+    /// @param size Position size (positive=long, negative=short)
+    /// @param entryPrice Entry price
+    /// @param exitPrice Exit price
+    function _calcPnl(int256 size, uint256 entryPrice, uint256 exitPrice) internal pure returns (int256) {
+        // PnL = size * (exitPrice - entryPrice) / entryPrice
+        if (entryPrice == 0) return 0;
+        int256 priceDiff = int256(exitPrice) - int256(entryPrice);
+        return (size * priceDiff) / int256(entryPrice);
+    }
 
     function _removePosition(bytes32 id) internal {
         for (uint256 i = 0; i < activePositionIds.length; i++) {
