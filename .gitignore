@@ -18,3 +18,4 @@ docs/
 # Coverage
 lcov.info
 coverage/
+__pycache__/
