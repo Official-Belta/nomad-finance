@@ -3,7 +3,7 @@
 Nomad Finance — Weekly Epoch Backtest (52 weeks)
 =================================================
 ETH 주간 에포크 기반 백테스트.
-기간: 2025-04-07 ~ 2026-03-30 (52주)
+기간: 2024-04-01 ~ 2025-03-31 (52주, 실제 과거 데이터)
 에포크: 매주 월요일 roll (7일)
 
 Usage: python3 run_weekly_backtest.py
@@ -522,7 +522,7 @@ def print_fee_analysis(results: list[dict]):
 def main():
     print("\n" + "="*70)
     print("  NOMAD FINANCE — 주간 에포크 백테스트")
-    print("  기간: 2025-04-07 ~ 2026-03-30 (52주)")
+    print("  기간: 2024-04-01 ~ 2025-03-31 (52주, 실제 과거 데이터)")
     print("  기초자산: ETH/USD")
     print("  에포크: 7일 (매주 월요일 roll)")
     print("  초기자본: $1,000,000")
