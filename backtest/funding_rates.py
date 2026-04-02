@@ -44,12 +44,16 @@ def generate_funding_rates(weekly_prices: np.ndarray) -> np.ndarray:
     weekly_rets = get_weekly_returns(weekly_prices)
     regimes = classify_all_weeks(weekly_prices)
 
-    # Regime baselines (8h rate)
+    # Regime baselines (8h rate) — calibrated from real Hyperliquid data:
+    # Q3 2025 Hyperliquid ETH avg: 0.0131% per 8h (~14.3% ann)
+    # Q1 2026 bear: -0.0088% per 8h (~-9.6% ann)
+    # Full 2025 avg: ~5% ann
+    # Source: BitMEX Q3 2025 Derivatives Report, CoinGlass, Ethena data
     REGIME_BASE = {
-        Regime.BULL_TREND: 0.00025,        # 0.025% per 8h ≈ 27% ann
-        Regime.LOW_VOL_SIDEWAYS: 0.00010,  # 0.010% per 8h ≈ 11% ann
-        Regime.HIGH_VOL_SIDEWAYS: 0.00015, # 0.015% per 8h ≈ 16% ann
-        Regime.BEAR_TREND: -0.00005,       # -0.005% per 8h ≈ -5% ann
+        Regime.BULL_TREND: 0.00035,        # 0.035% per 8h ≈ 38% ann (euphoria spikes)
+        Regime.LOW_VOL_SIDEWAYS: 0.00013,  # 0.013% per 8h ≈ 14% ann (Hyperliquid avg)
+        Regime.HIGH_VOL_SIDEWAYS: 0.00018, # 0.018% per 8h ≈ 20% ann
+        Regime.BEAR_TREND: -0.00009,       # -0.009% per 8h ≈ -10% ann (confirmed Q1 2026)
     }
 
     all_rates = np.zeros((n_weeks, 21))
